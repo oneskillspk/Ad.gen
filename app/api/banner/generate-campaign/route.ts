@@ -14,7 +14,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ai = getGeminiClient();
+    let ai;
+    try {
+      ai = getGeminiClient();
+    } catch (e: any) {
+      if (e.message?.includes("GEMINI_API_KEY")) {
+        return generateFallbackCampaign(config);
+      }
+      throw e;
+    }
 
     // 1. Generate Banner Ad Copy System using gemini-3.6-flash
     const copyPrompt = `You are a world-class digital advertising copywriter and marketing director.
@@ -280,3 +288,72 @@ async function generateImageHelper(
   const seed = Math.floor(Math.random() * 1000);
   return `https://picsum.photos/seed/ad-${seed}/1200/800`;
 }
+
+function generateFallbackCampaign(config: CampaignConfig) {
+  const brandName = config.brandName || config.productName || "BRAND";
+  const productName = config.productName || "FEATURED PRODUCT";
+
+  const generatedBanners: BannerAdData[] = AD_FORMAT_SPECS.map((spec) => {
+    const isVertical = spec.height > spec.width * 1.2;
+    const isHorizontal = spec.width > spec.height * 1.2;
+
+    let headline = `ELEVATE YOUR ${productName.toUpperCase()}`;
+    let subheadline = config.productDescription || "Limited time offer. Premium quality guaranteed.";
+
+    if (isHorizontal) {
+      headline = `UNLEASH ${productName.toUpperCase()} NOW`;
+      subheadline = "Exclusive Deal • Instant Savings Today";
+    } else if (isVertical) {
+      headline = `TRANSFORM YOUR DAY WITH ${productName.toUpperCase()}`;
+      subheadline = "Experience unmatched performance & premium design.";
+    }
+
+    const seed = Math.floor(Math.random() * 1000);
+    const bgImageUrl = `https://picsum.photos/seed/ad-${spec.id}-${seed}/1200/800`;
+
+    return {
+      id: `${spec.id}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      sizeId: spec.id,
+      width: spec.width,
+      height: spec.height,
+      aspectRatio: spec.aspectRatio,
+      headline,
+      subheadline,
+      ctaText: "SHOP DEAL NOW",
+      badgeText: "SPECIAL OFFER",
+      ctaUrl: config.productUrl || "https://example.com",
+      brandName,
+      productName,
+      colorScheme: {
+        primary: config.customColors?.primary || "#C1FF72",
+        primaryText: "#000000",
+        accentColor: config.customColors?.accent || "#FFFFFF",
+        accentText: "#000000",
+        background: config.customColors?.background || "#0A0A0A",
+        textColor: "#FFFFFF",
+        cardBg: "rgba(10, 10, 10, 0.85)",
+      },
+      fontFamily: "sans",
+      layoutStyle: "overlay",
+      overlayOpacity: 35,
+      borderRadius: 0,
+      bgImageUrl,
+      bgImagePrompt: `Studio product background for ${productName}`,
+      productDescription: config.productDescription,
+      productUrl: config.productUrl,
+    };
+  });
+
+  return NextResponse.json({
+    success: true,
+    banners: generatedBanners,
+    warning: "GEMINI_API_KEY environment variable is missing on Vercel. Standard ad template was generated with placeholder graphics.",
+    campaignInfo: {
+      productName: config.productName,
+      brandName,
+      modelUsed: "template-fallback",
+      resolutionUsed: "1K",
+    },
+  });
+}
+

@@ -19,7 +19,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ai = getGeminiClient();
+    let ai;
+    try {
+      ai = getGeminiClient();
+    } catch (e: any) {
+      if (e.message?.includes("GEMINI_API_KEY")) {
+        const seed = Math.floor(Math.random() * 1000);
+        return NextResponse.json({
+          success: true,
+          imageUrl: `https://picsum.photos/seed/bg-${seed}/1200/800`,
+          usedModel: "placeholder-fallback",
+          resolution: imageSize,
+          aspectRatio,
+        });
+      }
+      throw e;
+    }
 
     // Sanitize aspect ratio to supported API values or mapped standard
     let targetAspectRatio = aspectRatio;
