@@ -1,0 +1,6 @@
+{
+  "name": "AI Banner Ad Studio",
+  "description": "Generate high-quality banner ads in all standard display and social sizes from product descriptions and URLs using Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
