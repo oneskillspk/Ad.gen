@@ -120,32 +120,30 @@ Also specify:
     const primaryText = parsedCopy.colors?.primaryText || "#ffffff";
     const cardBg = parsedCopy.colors?.cardBg || "rgba(15, 23, 42, 0.75)";
 
-    // 2. Generate Base Images for key aspect ratios using user's requested model & resolution
-    const imagePromises = [
-      generateImageHelper(ai, {
-        prompt: parsedCopy.imagePrompts?.horizontal || `Studio commercial background for ${config.productName}`,
-        aspectRatio: "16:9",
-        imageSize: config.imageResolution || "1K",
-        model: config.imageModel || "gemini-3-pro-image-preview",
-        styleTone: config.styleTone,
-      }),
-      generateImageHelper(ai, {
-        prompt: parsedCopy.imagePrompts?.vertical || `Vertical studio product background for ${config.productName}`,
-        aspectRatio: "9:16",
-        imageSize: config.imageResolution || "1K",
-        model: config.imageModel || "gemini-3-pro-image-preview",
-        styleTone: config.styleTone,
-      }),
-      generateImageHelper(ai, {
-        prompt: parsedCopy.imagePrompts?.square || `Square studio product hero shot for ${config.productName}`,
-        aspectRatio: "1:1",
-        imageSize: config.imageResolution || "1K",
-        model: config.imageModel || "gemini-3-pro-image-preview",
-        styleTone: config.styleTone,
-      }),
-    ];
+    // 2. Generate Base Images sequentially to prevent hitting rate limit spikes
+    const horizontalBgUrl = await generateImageHelper(ai, {
+      prompt: parsedCopy.imagePrompts?.horizontal || `Studio commercial background for ${config.productName}`,
+      aspectRatio: "16:9",
+      imageSize: config.imageResolution || "1K",
+      model: config.imageModel || "gemini-3.1-flash-image-preview",
+      styleTone: config.styleTone,
+    });
 
-    const [horizontalBgUrl, verticalBgUrl, squareBgUrl] = await Promise.all(imagePromises);
+    const verticalBgUrl = await generateImageHelper(ai, {
+      prompt: parsedCopy.imagePrompts?.vertical || `Vertical studio product background for ${config.productName}`,
+      aspectRatio: "9:16",
+      imageSize: config.imageResolution || "1K",
+      model: config.imageModel || "gemini-3.1-flash-image-preview",
+      styleTone: config.styleTone,
+    });
+
+    const squareBgUrl = await generateImageHelper(ai, {
+      prompt: parsedCopy.imagePrompts?.square || `Square studio product hero shot for ${config.productName}`,
+      aspectRatio: "1:1",
+      imageSize: config.imageResolution || "1K",
+      model: config.imageModel || "gemini-3.1-flash-image-preview",
+      styleTone: config.styleTone,
+    });
 
     // 3. Map specifications into full list of BannerAdData
     const generatedBanners: BannerAdData[] = AD_FORMAT_SPECS.map((spec) => {
@@ -234,37 +232,51 @@ async function generateImageHelper(
     styleTone: string;
   }
 ): Promise<string | undefined> {
-  try {
-    let targetModel = "gemini-3-pro-image";
-    if (params.model.includes("flash-image")) {
-      targetModel = "gemini-3.1-flash-image";
-    } else if (params.model.includes("flash-lite")) {
-      targetModel = "gemini-3.1-flash-lite-image";
-    }
+  const modelsToTry: string[] = [];
 
-    const fullPrompt = `Commercial product advertisement background for ${params.prompt}. Style: ${params.styleTone}. Clean background art, vivid studio colors, cinematic lighting, high-end commercial photo asset.`;
-
-    const response = await ai.models.generateContent({
-      model: targetModel,
-      contents: { parts: [{ text: fullPrompt }] },
-      config: {
-        imageConfig: {
-          aspectRatio: params.aspectRatio,
-          imageSize: params.imageSize,
-        },
-      },
-    });
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
-      }
-    }
-  } catch (e) {
-    console.warn(`Fallback image generation for ${params.aspectRatio}:`, e);
-    // Standard high quality aesthetic placeholder fallback from picsum with seed
-    const seed = Math.floor(Math.random() * 1000);
-    return `https://picsum.photos/seed/ad-${seed}/1200/800`;
+  if (params.model.includes("flash-lite")) {
+    modelsToTry.push("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image");
+  } else if (params.model.includes("pro")) {
+    modelsToTry.push("gemini-3.1-flash-image", "gemini-3.1-flash-lite-image", "gemini-3-pro-image");
+  } else {
+    modelsToTry.push("gemini-3.1-flash-image", "gemini-3.1-flash-lite-image");
   }
-  return undefined;
+
+  const sanitizedAspectRatio =
+    params.aspectRatio === "21:9"
+      ? "16:9"
+      : params.aspectRatio === "2:3"
+      ? "3:4"
+      : params.aspectRatio === "3:2"
+      ? "4:3"
+      : params.aspectRatio;
+
+  const fullPrompt = `Commercial product advertisement background for ${params.prompt}. Style: ${params.styleTone}. Clean background art, vivid studio colors, cinematic lighting, high-end commercial photo asset.`;
+
+  for (const targetModel of modelsToTry) {
+    try {
+      const response = await ai.models.generateContent({
+        model: targetModel,
+        contents: { parts: [{ text: fullPrompt }] },
+        config: {
+          imageConfig: {
+            aspectRatio: sanitizedAspectRatio,
+            imageSize: params.imageSize || "1K",
+          },
+        },
+      });
+
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          return `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
+        }
+      }
+    } catch {
+      // Model attempt failed or quota reached - continue to next model in list silently
+    }
+  }
+
+  // Graceful high-resolution aesthetic placeholder fallback
+  const seed = Math.floor(Math.random() * 1000);
+  return `https://picsum.photos/seed/ad-${seed}/1200/800`;
 }

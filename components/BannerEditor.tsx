@@ -29,7 +29,7 @@ export const BannerEditor: React.FC<BannerEditorProps> = ({
   const [activeTab, setActiveTab] = useState<'content' | 'design' | 'image' | 'export'>('content');
   const [imagePrompt, setImagePrompt] = useState(banner.bgImagePrompt || `Studio visual background for ${banner.productName || 'product'}`);
   const [selectedResolution, setSelectedResolution] = useState<ImageResolutionOption>('1K');
-  const [selectedModel, setSelectedModel] = useState<ImageModelOption>('gemini-3-pro-image-preview');
+  const [selectedModel, setSelectedModel] = useState<ImageModelOption>('gemini-3.1-flash-image-preview');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatioOption>(banner.aspectRatio || '16:9');
   
   // Refine copy modal/loading

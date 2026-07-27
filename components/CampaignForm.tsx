@@ -68,7 +68,7 @@ export const CampaignForm: React.FC<CampaignFormProps> = ({
 
   // Explicit Image Affordances (Required by prompt blocks!)
   const [imageResolution, setImageResolution] = useState<ImageResolutionOption>('1K');
-  const [imageModel, setImageModel] = useState<ImageModelOption>('gemini-3-pro-image-preview');
+  const [imageModel, setImageModel] = useState<ImageModelOption>('gemini-3.1-flash-image-preview');
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('16:9');
 
   const [isAnalyzingUrl, setIsAnalyzingUrl] = useState(false);
