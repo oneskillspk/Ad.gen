@@ -7,6 +7,9 @@ const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-Q6FGZL9W
 export const metadata: Metadata = {
   title: 'AI Banner Ad Studio',
   description: 'Generate high-quality banner ads in all standard display and social sizes using Gemini AI.',
+  verification: {
+    google: 'google4d5c5e8bca4799fa',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
